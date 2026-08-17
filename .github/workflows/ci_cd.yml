@@ -1,0 +1,132 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  ci:
+    name: Build and test
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY_BASE: 'K0lTaB5uLOIWYOzDSzBR1ZBYQZwwqC7PXiXTZi4+ynGXqOQ+VtWrR/gLY0O4vw7M'
+      DATABASE_URL: 'ecto://postgres:postgres@localhost/backend_test'
+
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1.24.0
+      with:
+        otp-version: '29.0.5'
+        elixir-version: '1.20.3'
+
+    - name: Set mix.lock file hash environment variable
+      run: echo "MIX_LOCK_HASH=${{ hashFiles('**/mix.lock') }}" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Restore dependencies cache
+      uses: actions/cache@v5
+      with:
+        path: deps*
+        key: ${{ runner.os }}-deps-${{ env.MIX_LOCK_HASH }}
+        restore-keys: ${{ runner.os }}-mix-
+
+    - name: Install dependencies
+      run: mix deps.get
+
+    - name: Restore build artifacts
+      uses: actions/cache@v5
+      with:
+        path: _build*
+        key: ${{ runner.os }}-build-${{ env.MIX_LOCK_HASH }}
+        restore-keys: ${{ runner.os }}-build-
+
+    - name: Compile warnings as errors
+      run: mix compile --warnings-as-errors
+
+    - name: Check formatting
+      run:  mix format --check-formatted
+
+    - name: esbuild
+      run: |
+        mix assets.setup
+        mix assets.build	
+
+    - name: tests
+      run: mix test
+
+    - name: Restore dialyzer PLTS
+      uses: actions/cache@v5
+      with:
+        path: dialyzer_plts
+        key: ${{ runner.os }}-plts-${{ env.MIX_LOCK_HASH }}
+        restore-keys: ${{ runner.os }}-plts-
+
+    - name: Run dialyzer
+      run: mix dialyzer
+      env:
+        MIX_ENV: dev
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v7
+      if: failure()
+      with:
+        name: failure-screenshots
+        path: screenshots
+  build-push:
+    name: Push build to GH Docker Registry
+    runs-on: ubuntu-latest
+    needs: ci
+    env:
+      IMAGE_BUILD: ghcr.io/mnussbaumer/dummyash
+      ERLANG_VERSION: '29.0.5'
+      ELIXIR_VERSION: '1.20.3'
+      DATABASE_URL: 'ecto://postgres:postgres@db:5432'
+      SECRET_KEY_BASE: 'K0lTaB5uLOIWYOzDSzBR1ZBYQZwwqC7PXiXTZi4+ynGXqOQ+VtWrR/gLY0O4vw7M'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GH_PAT }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.IMAGE_BUILD }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=pr
+            type=sha,format=short
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          cache-from: type=registry,ref=${{ env.IMAGE_BUILD }}:cache
+          cache-to: type=registry,ref=${{ env.IMAGE_BUILD }}:cache,mode=max
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: true
+          build-args: |
+            ELIXIR_VERSION=${{ env.ELIXIR_VERSION }}
+            OTP_VERSION=${{ env.ERLANG_VERSION }}
+            ERL_FLAGS=+JPperf true
+            SECRET_KEY_BASE=${{ env.SECRET_KEY_BASE }}
+            DATABASE_URL=${{ env.DATABASE_URL }}
