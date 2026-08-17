@@ -14,6 +14,10 @@ defmodule DummyashWeb.Router do
     plug :accepts, ["json"]
   end
 
+  scope "/api/health" do
+    get "/", DummyashWeb.PageController, :health
+  end
+
   scope "/api/json" do
     pipe_through [:api]
 

@@ -65,7 +65,8 @@ config :spark,
 
 config :dummyash,
   ecto_repos: [Dummyash.Repo],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  ash_domains: [DummyAsh.Projects]
 
 # Configure the endpoint
 config :dummyash, DummyashWeb.Endpoint,
