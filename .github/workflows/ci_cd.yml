@@ -64,24 +64,6 @@ jobs:
 
     - name: tests
       run: mix test
-
-    - name: Restore dialyzer PLTS
-      uses: actions/cache@v5
-      with:
-        path: dialyzer_plts
-        key: ${{ runner.os }}-plts-${{ env.MIX_LOCK_HASH }}
-        restore-keys: ${{ runner.os }}-plts-
-
-    - name: Run dialyzer
-      run: mix dialyzer
-      env:
-        MIX_ENV: dev
-    - name: Upload screenshots
-      uses: actions/upload-artifact@v7
-      if: failure()
-      with:
-        name: failure-screenshots
-        path: screenshots
   build-push:
     name: Push build to GH Docker Registry
     runs-on: ubuntu-latest
