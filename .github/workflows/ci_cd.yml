@@ -23,9 +23,9 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v7
     - name: Set up Elixir
-      uses: erlef/setup-beam@v1.24.0
+      uses: erlef/setup-beam@v1.24.1
       with:
         otp-version: '29.0.5'
         elixir-version: '1.20.3'
@@ -35,7 +35,7 @@ jobs:
       shell: bash
 
     - name: Restore dependencies cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: deps*
         key: ${{ runner.os }}-deps-${{ env.MIX_LOCK_HASH }}
@@ -45,7 +45,7 @@ jobs:
       run: mix deps.get
 
     - name: Restore build artifacts
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: _build*
         key: ${{ runner.os }}-build-${{ env.MIX_LOCK_HASH }}
@@ -75,7 +75,7 @@ jobs:
       DATABASE_URL: 'ecto://postgres:postgres@db:5432'
       SECRET_KEY_BASE: 'K0lTaB5uLOIWYOzDSzBR1ZBYQZwwqC7PXiXTZi4+ynGXqOQ+VtWrR/gLY0O4vw7M'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Login to GHCR
         uses: docker/login-action@v4
         with:
@@ -84,7 +84,7 @@ jobs:
           password: ${{ secrets.GH_PAT }}
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.IMAGE_BUILD }}
@@ -92,12 +92,12 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=pr
             type=sha,format=short
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v7
         with:
           context: .
           cache-from: type=registry,ref=${{ env.IMAGE_BUILD }}:cache
