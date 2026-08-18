@@ -42,4 +42,8 @@ ENV MIX_ENV="dev"
 # install mix dependencies
 COPY mix.exs mix.lock* ./
 
+LABEL org.opencontainers.image.source=https://github.com/mnussbaumer/dummyash
+LABEL org.opencontainers.image.description="Dummy Ash App"
+LABEL org.opencontainers.image.licenses=MIT
+
 ENTRYPOINT ["./entrypoint.sh"]
